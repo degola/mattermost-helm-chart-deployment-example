@@ -1,0 +1,61 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-volume-claim-mattermost
+  labels:
+    app: postgres-mattermost
+spec:
+  storageClassName: longhorn
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 8Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres-mattermost
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-mattermost
+  template:
+    metadata:
+      labels:
+        app: postgres-mattermost
+    spec:
+      containers:
+        - name: postgres
+          image: 'postgres:16'
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgresql-credentials-mattermost
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgresdata
+      volumes:
+        - name: postgresdata
+          persistentVolumeClaim:
+            claimName: postgres-volume-claim-mattermost
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-mattermost
+  labels:
+    app: postgres-mattermost
+spec:
+  ports:
+    - port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres-mattermost
